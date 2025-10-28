@@ -1,0 +1,10 @@
+pizza
+sushi
+hamburger
+french_fries
+spaghetti_bolognese
+fried_rice
+chicken_wings
+ceaser_salad
+steak
+ice_cream
