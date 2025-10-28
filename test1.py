@@ -4,7 +4,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 # ----------- USER SETTINGS -----------
 MODEL_PATH = "model.pth"             # path to your trained weights (.pth)
-IMAGE_PATH = "Perfect-Pan-Seared-Ribeye-Steak.jpg"              # single image path
+IMAGE_PATH = "Ice_Cream.jpg"              # single image path
 CLASS_NAMES = ['caesar_salad', 'chicken_wings', 'french_fries', 'fried_rice', 'hamburger', 'ice_cream', 'pizza', 'spaghetti_bolognese', 'steak', 'sushi']
 IMG_SIZE = 256                       # EfficientNet_B2 expects 260x260
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
