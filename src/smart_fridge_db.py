@@ -123,3 +123,18 @@ def delete_item(item_id: int) -> int:
             return cur.rowcount
     finally:
         conn.close()
+
+def clear_database():
+    """Deletes all rows from food_items and food_types."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SET FOREIGN_KEY_CHECKS = 0;")
+            cur.execute("TRUNCATE TABLE food_items;")
+            cur.execute("TRUNCATE TABLE food_types;")
+            cur.execute("SET FOREIGN_KEY_CHECKS = 1;")
+        conn.commit()
+        print("🧹 Database cleared.")
+    finally:
+        conn.close()
+
