@@ -1,6 +1,7 @@
 import mysql.connector
-from datetime import date
 from . import config
+from datetime import date, timedelta
+from src.shelf_life_data import SHELF_LIFE_DAYS 
 
 def get_connection():
     """Create a new DB connection."""
@@ -52,24 +53,22 @@ def get_or_create_food_type_id(name: str, category: str = None, average_shelf_li
 def add_item(food_type_id: int, quantity: float = 1, unit: str = 'pcs',
              added_by: str = 'user', detection_label: str = None,
              confidence: float = None, date_added: date = None,
-             expiration_date=None, location_slot: str = None, image_path: str = None) -> int:
-    """
-    Insert an item. If expiration_date is None, the DB trigger uses the food type's shelf life.
-    Returns the inserted item_id.
-    """
+             expiration_date=None, location_slot: str = None,
+             image_path: str = None, storage: str = 'fridge') -> int:      # ← NEW param
     if date_added is None:
         date_added = date.today()
-
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO food_items
                     (food_type_id, quantity, unit, date_added, expiration_date,
-                     detection_label, confidence_score, image_path, location_slot, added_by)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                     detection_label, confidence_score, image_path, location_slot,
+                     added_by, storage)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
             """, (food_type_id, quantity, unit, date_added, expiration_date,
-                  detection_label, confidence, image_path, location_slot, added_by))
+                  detection_label, confidence, image_path, location_slot,
+                  added_by, storage))
             conn.commit()
             return cur.lastrowid
     finally:
@@ -78,15 +77,12 @@ def add_item(food_type_id: int, quantity: float = 1, unit: str = 'pcs',
 def add_item_by_name(name: str, quantity: float = 1, unit: str = 'pcs',
                      added_by: str = 'user', detection_label: str = None,
                      confidence: float = None, category: str = None,
-                     average_shelf_life_days: int = None, **kwargs) -> int:
-    """
-    Convenience: ensure the food type exists, then add the item.
-    kwargs are passed to add_item (e.g., location_slot, image_path).
-    """
+                     average_shelf_life_days: int = None, storage: str = 'fridge', **kwargs) -> int:  # ← NEW
     ftid = get_or_create_food_type_id(name, category=category,
                                       average_shelf_life_days=average_shelf_life_days)
     return add_item(ftid, quantity=quantity, unit=unit, added_by=added_by,
-                    detection_label=detection_label or name, confidence=confidence, **kwargs)
+                    detection_label=detection_label or name, confidence=confidence,
+                    storage=storage, **kwargs)
 
 def get_all_items():
     """Return all items with computed status (via view) as dicts."""
@@ -98,20 +94,24 @@ def get_all_items():
     finally:
         conn.close()
 
+
 def get_expiring_items(days: int = 2):
-    """Return items expiring within the next 'days' days (including today)."""
+    """Return items expiring within next 'days' days (fridge only)."""
     conn = get_connection()
     try:
         with conn.cursor(dictionary=True) as cur:
             cur.execute("""
-                SELECT * FROM item_status_view
-                WHERE expiration_date IS NOT NULL
+                SELECT *
+                FROM item_status_view
+                WHERE storage = 'fridge'
+                  AND expiration_date IS NOT NULL
                   AND DATEDIFF(expiration_date, CURDATE()) BETWEEN 0 AND %s
                 ORDER BY expiration_date;
             """, (days,))
             return cur.fetchall()
     finally:
         conn.close()
+
 
 def delete_item(item_id: int) -> int:
     """Delete an item by id. Returns number of rows affected."""
@@ -137,4 +137,94 @@ def clear_database():
         print("🧹 Database cleared.")
     finally:
         conn.close()
+
+def get_freezer_items():
+    conn = get_connection()
+    try:
+        with conn.cursor(dictionary=True) as cur:
+            cur.execute("SELECT * FROM item_status_view WHERE storage='freezer' ORDER BY food_name;")
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+def add_item_simple(name: str, quantity: float = 1, unit: str = "pcs", 
+                    expiration_date: str | None = None, storage: str = "fridge") -> int:
+    """
+    Add a food item by name only.
+    You specify: name, quantity, unit, and optionally expiration_date.
+    If expiration_date is omitted, it's auto-calculated using the shelf-life dictionary.
+    """
+    from .smart_fridge_db import get_or_create_food_type_id, add_item   # to avoid circular imports
+
+    # Look up or create the food type and its default shelf life
+    shelf_life = SHELF_LIFE_DAYS.get(name, 7)
+    food_type_id = get_or_create_food_type_id(name, average_shelf_life_days=shelf_life)
+
+    # Determine the expiry date if none given
+    if not expiration_date and storage == "fridge":
+        expiration_date = date.today().toordinal() + shelf_life  # temp as int
+        expiration_date = date.fromordinal(expiration_date)
+    elif storage == "freezer":
+        expiration_date = None  # frozen items don't expire
+
+    # Insert into DB
+    item_id = add_item(
+        food_type_id=food_type_id,
+        quantity=quantity,
+        unit=unit,
+        expiration_date=expiration_date,
+        detection_label=name,
+        added_by="user",
+        storage=storage
+    )
+
+    print(f"✅ Added {quantity} {unit} of {name} ({storage})"
+          f"{' expiring on ' + str(expiration_date) if expiration_date else ''}")
+    return item_id
+
+def add_item_by_image(
+    image_path: str,
+    quantity: float,
+    unit: str = "pcs",
+    name: str | None = None,                 # optional: if you already know the label
+    expiration_date: str | date | None = None,
+    storage: str = "fridge",                 # 'fridge' | 'freezer'
+    detection_label: str | None = None,      # optional: if coming from a model
+    confidence: float | None = None,
+    location_slot: str | None = None,
+) -> int:
+    """
+    Create/lookup the food type (by 'name' or 'detection_label'), then insert an item
+    with the provided image, quantity, unit, and optional expiry date.
+    If no expiry is passed:
+      - fridge: uses SHELF_LIFE_DAYS to compute a date
+      - freezer: keeps expiration_date = NULL
+    """
+    label = name or detection_label or "Unknown"
+    shelf_life = SHELF_LIFE_DAYS.get(label, 7)
+
+    # ensure food type exists
+    ftid = get_or_create_food_type_id(label, average_shelf_life_days=shelf_life)
+
+    # normalize expiration_date
+    exp_dt: date | None
+    if expiration_date:
+        exp_dt = date.fromisoformat(expiration_date) if isinstance(expiration_date, str) else expiration_date
+    else:
+        exp_dt = None if storage == "freezer" else (date.today() + timedelta(days=shelf_life))
+
+    # insert
+    return add_item(
+        food_type_id=ftid,
+        quantity=quantity,
+        unit=unit,
+        expiration_date=exp_dt,
+        detection_label=label,
+        confidence=confidence,
+        image_path=image_path,
+        location_slot=location_slot,
+        added_by="camera",
+        storage=storage,
+    )
+
 

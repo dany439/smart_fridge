@@ -34,19 +34,16 @@ def ensure_schema(
     conn = mysql.connector.connect(host=host, port=port, user=user, password=password, database=database)
     try:
         with conn.cursor() as cur:
-            # --- food_types ---
+            # ensure storage column exists (migration-safe)
             cur.execute("""
-                CREATE TABLE IF NOT EXISTS food_types (
-                    food_type_id INT AUTO_INCREMENT PRIMARY KEY,
-                    name VARCHAR(100) NOT NULL UNIQUE,
-                    category VARCHAR(50),
-                    average_shelf_life_days INT,
-                    calories_per_100g DECIMAL(6,2),
-                    notes TEXT
-                ) ENGINE=InnoDB;
-            """)
+                SELECT 1 FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA=%s AND TABLE_NAME='food_items' AND COLUMN_NAME='storage';
+            """, (database,))
+            has_storage = cur.fetchone() is not None
+            if not has_storage:
+                cur.execute("ALTER TABLE food_items ADD COLUMN storage ENUM('fridge','freezer') NOT NULL DEFAULT 'fridge';")
 
-            # --- food_items ---
+            # food_items (for fresh installs; IF NOT EXISTS keeps it safe)
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS food_items (
                     item_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -60,14 +57,16 @@ def ensure_schema(
                     image_path VARCHAR(255),
                     location_slot VARCHAR(50),
                     added_by ENUM('user','camera','barcode') DEFAULT 'user',
+                    storage ENUM('fridge','freezer') NOT NULL DEFAULT 'fridge',
                     CONSTRAINT fk_food_items_type
                         FOREIGN KEY (food_type_id) REFERENCES food_types(food_type_id)
                         ON DELETE CASCADE ON UPDATE CASCADE,
-                    INDEX idx_expiration_date (expiration_date)
+                    INDEX idx_expiration_date (expiration_date),
+                    INDEX idx_storage (storage)
                 ) ENGINE=InnoDB;
             """)
 
-            # --- view (computed status) ---
+            # view
             cur.execute("""
                 CREATE OR REPLACE VIEW item_status_view AS
                 SELECT 
@@ -80,11 +79,13 @@ def ensure_schema(
                     i.date_added,
                     i.expiration_date,
                     CASE
-                        WHEN i.expiration_date IS NULL THEN 'unknown'
-                        WHEN i.expiration_date < CURDATE() THEN 'expired'
+                        WHEN i.storage = 'freezer'              THEN 'frozen'
+                        WHEN i.expiration_date IS NULL          THEN 'unknown'
+                        WHEN i.expiration_date < CURDATE()      THEN 'expired'
                         WHEN DATEDIFF(i.expiration_date, CURDATE()) <= 2 THEN 'expiring soon'
                         ELSE 'fresh'
                     END AS status,
+                    i.storage,
                     i.location_slot,
                     i.added_by,
                     i.detection_label,
@@ -94,15 +95,13 @@ def ensure_schema(
                 JOIN food_types t ON i.food_type_id = t.food_type_id;
             """)
 
-            # --- trigger (only if missing) ---
+            # trigger (create only if missing)
             cur.execute("""
                 SELECT 1
                 FROM information_schema.TRIGGERS
-                WHERE TRIGGER_SCHEMA = %s
-                  AND TRIGGER_NAME = 'set_expiration_date_before_insert';
+                WHERE TRIGGER_SCHEMA = %s AND TRIGGER_NAME = 'set_expiration_date_before_insert';
             """, (database,))
             exists = cur.fetchone() is not None
-
             if not exists:
                 cur.execute("""
                     CREATE TRIGGER set_expiration_date_before_insert
@@ -110,13 +109,14 @@ def ensure_schema(
                     FOR EACH ROW
                     BEGIN
                         DECLARE shelf_life INT;
-                        SELECT average_shelf_life_days
-                          INTO shelf_life
-                          FROM food_types
-                         WHERE food_type_id = NEW.food_type_id;
-
-                        IF NEW.expiration_date IS NULL AND shelf_life IS NOT NULL THEN
-                            SET NEW.expiration_date = DATE_ADD(NEW.date_added, INTERVAL shelf_life DAY);
+                        IF NEW.storage = 'freezer' THEN
+                            SET NEW.expiration_date = NULL;
+                        ELSE
+                            SELECT average_shelf_life_days INTO shelf_life
+                            FROM food_types WHERE food_type_id = NEW.food_type_id;
+                            IF NEW.expiration_date IS NULL AND shelf_life IS NOT NULL THEN
+                                SET NEW.expiration_date = DATE_ADD(NEW.date_added, INTERVAL shelf_life DAY);
+                            END IF;
                         END IF;
                     END
                 """)
