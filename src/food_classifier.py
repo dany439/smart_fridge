@@ -99,9 +99,9 @@ def classify_food(image_path,
     """
     if class_names is None:
         class_names = [
-            'caesar_salad', 'chicken_wings', 'french_fries',
-            'fried_rice', 'hamburger', 'ice_cream',
-            'pizza', 'spaghetti_bolognese', 'steak', 'sushi'
+            'Caesar Salad', 'Chicken Wings', 'French Fries',
+            'Fried Rice', 'Hamburger', 'Ice Cream',
+            'Pizza', 'Spaghetti Bolognese', 'Steak', 'Sushi'
         ]
 
     # Get cached model and class names (or load them on first call)

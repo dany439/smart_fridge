@@ -277,3 +277,127 @@ def add_item_by_image(
     return item_id
 
 
+def consume(name: str, qty_used: float, item_id: int | None = None) -> str:
+    """
+    Consume (use/eat) a quantity of a food item.
+
+    Args:
+        name (str): The food name as stored in item_status_view.food_name.
+        qty_used (float): How much of the item you consumed.
+        item_id (int | None): Optional. If given, we target that exact row.
+                              If None:
+                                - if there is exactly ONE item with this name → we use it
+                                - if there are MULTIPLE items → we raise an error asking for item_id
+
+    Returns:
+        str: "deleted"  if the item was fully consumed and removed from DB
+             "updated"  if only quantity was decreased
+
+    Raises:
+        ValueError: if qty_used is invalid, item not found, or more was requested than available.
+    """
+
+    # --- Basic validation on qty_used ---
+    if qty_used <= 0:
+        raise ValueError("Consumed quantity must be positive.")
+
+    # ------------------------------------------------------------------
+    # 1) FIRST PHASE: READ-ONLY SELECT (using first DB connection)
+    # ------------------------------------------------------------------
+    # We open a connection only to read from item_status_view and then
+    # CLOSE IT COMPLETELY before doing any write queries.
+    # This avoids "Commands out of sync" errors from MySQL.
+    # ------------------------------------------------------------------
+    conn = get_connection()
+    try:
+        # dictionary=True → rows are dicts: row["item_id"], row["quantity"], etc.
+        with conn.cursor(dictionary=True) as cur:
+            # Get all rows for this food name, ordered by soonest expiration first.
+            cur.execute("""
+                SELECT item_id, quantity, unit, expiration_date
+                FROM item_status_view
+                WHERE food_name = %s
+                ORDER BY expiration_date ASC;
+            """, (name,))
+            items = cur.fetchall()
+    finally:
+        # Close the first connection entirely after reading.
+        conn.close()
+
+    # If there are no items at all with this name, we can't consume anything.
+    if not items:
+        raise ValueError(f"'{name}' is not in your fridge.")
+
+    # ------------------------------------------------------------------
+    # 2) DECIDE WHICH ROW TO CONSUME FROM
+    # ------------------------------------------------------------------
+
+    # If item_id is NOT provided:
+    if item_id is None:
+        # If there is exactly one matching item, it's safe to auto-pick it.
+        if len(items) == 1:
+            item = items[0]
+        else:
+            # Ambiguous: multiple items with same name.
+            # We force the caller to specify item_id to avoid consuming wrong row.
+            raise ValueError(
+                f"Multiple '{name}' items exist. Specify item_id. "
+                f"IDs available: " + ", ".join(str(i['item_id']) for i in items)
+            )
+    else:
+        # If item_id IS provided, we search among the fetched rows for that exact id.
+        matching = [i for i in items if i["item_id"] == item_id]
+        if not matching:
+            # No row with that id + name combination.
+            raise ValueError(f"No '{name}' found with item_id={item_id}.")
+        item = matching[0]
+
+    # Extract current quantity and its unit from the chosen row.
+    current_qty = float(item["quantity"])
+    unit = item["unit"]
+    item_id = item["item_id"]  # ensure we use the exact id from DB
+
+    # ------------------------------------------------------------------
+    # 3) VALIDATE THAT WE ARE NOT EATING MORE THAN WE HAVE
+    # ------------------------------------------------------------------
+    if qty_used > current_qty:
+        raise ValueError(
+            f"Cannot consume {qty_used}{unit}; only {current_qty}{unit} available."
+        )
+
+    # ------------------------------------------------------------------
+    # 4) SECOND PHASE: WRITE OPERATION (new DB connection)
+    # ------------------------------------------------------------------
+    # We open a NEW connection for the DELETE/UPDATE.
+    # This separation (read-connection vs write-connection) avoids the
+    # "Commands out of sync" problems MySQL sometimes has when you do
+    # SELECT then DELETE/UPDATE on the same connection/cursor.
+    # ------------------------------------------------------------------
+    conn2 = get_connection()
+    try:
+        with conn2.cursor() as cur2:
+
+            # ---- Case A: we consumed exactly the entire quantity ----
+            if qty_used == current_qty:
+                # Delete the row completely from food_items.
+                cur2.execute("DELETE FROM food_items WHERE item_id = %s", (item_id,))
+                conn2.commit()
+                print(f"🗑️ Fully consumed and removed {name} (ID {item_id})")
+                return "deleted"
+
+            # ---- Case B: partial consumption, we just reduce the quantity ----
+            new_qty = current_qty - qty_used
+            cur2.execute("""
+                UPDATE food_items
+                SET quantity = %s
+                WHERE item_id = %s
+            """, (new_qty, item_id))
+            conn2.commit()
+
+            print(f"🍽️ Consumed {qty_used}{unit} of {name}. Remaining: {new_qty}{unit}.")
+            return "updated"
+
+    finally:
+        # Always close the second connection, even if an exception occurs.
+        conn2.close()
+

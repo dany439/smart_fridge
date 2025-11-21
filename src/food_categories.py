@@ -39,18 +39,18 @@ FOOD_CATEGORIES = {
     "Ketchup": "Condiment",
     "Mayonnaise": "Condiment",
 
-    # Prepared foods / cooked foods
-    "Cooked Rice": "Prepared",
-    "caesar_salad": "Prepared",
-    "chicken_wings": "Prepared",
-    "french_fries": "Prepared",
-    "fried_rice": "Prepared",
-    "hamburger": "Prepared",
-    "pizza": "Prepared",
-    "spaghetti_bolognese": "Prepared",
-    "steak": "Prepared",
-    "sushi": "Prepared",   # raw sushi = "Prepared" for storage purposes
-    "Leftovers": "Prepared",
+    # Leftovers foods / cooked foods
+    "Cooked Rice": "Leftovers",
+    "caesar Salad": "Leftovers",
+    "chicken Wings": "Leftovers",
+    "French Fries": "Leftovers",
+    "Fried Rice": "Leftovers",
+    "Hamburger": "Leftovers",
+    "Pizza": "Leftovers",
+    "Spaghetti Bolognese": "Leftovers",
+    "Steak": "Leftovers",
+    "Sushi": "Leftovers",   # raw sushi = "Leftovers" for storage purposes
+    "Leftovers": "Leftovers",
 
     # Frozen-only items
     "ice_cream": "Frozen",

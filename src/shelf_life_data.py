@@ -29,15 +29,15 @@ SHELF_LIFE_DAYS = {
     "Ketchup": 180,        # opened
     "Mayonnaise": 60,      # opened, commercial
     "Cooked Rice": 4,
-    'caesar_salad': 3,              # dressed greens; quality drops sooner
-    'chicken_wings': 4,             # cooked poultry
-    'french_fries': 4,              # cooked potatoes/veg
-    'fried_rice': 4,                # cooked rice
-    'hamburger': 4,                 # cooked ground beef patty
-    'ice_cream': 0,                 # keep FROZEN (not a fridge item)
-    'pizza': 4,
-    'spaghetti_bolognese': 4,       # cooked meat/pasta dish
-    'steak': 4,                     # cooked beef
-    'sushi': 1,                     # assume raw fish sushi; eat within 24h
+    'Caesar Salad': 3,              # dressed greens; quality drops sooner
+    'Chicken Wings': 4,             # cooked poultry
+    'French Fries': 4,              # cooked potatoes/veg
+    'Fried Rice': 4,                # cooked rice
+    'Hamburger': 4,                 # cooked ground beef patty
+    'Ice Cream': 0,                 # keep FROZEN (not a fridge item)
+    'Pizza': 4,
+    'Spaghetti Bolognese': 4,       # cooked meat/pasta dish
+    'Steak': 4,                     # cooked beef
+    'Sushi': 1,                     # assume raw fish sushi; eat within 24h
     "Leftovers": 4
 }

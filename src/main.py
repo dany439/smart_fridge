@@ -1,13 +1,13 @@
 from src.setup_db import ensure_schema
 from src.shelf_life_data import SHELF_LIFE_DAYS
 from src.food_categories import FOOD_CATEGORIES
-from src.smart_fridge_db import add_item_by_name, get_all_items, get_expiring_items, get_freezer_items, clear_database, add_item_simple, add_item_by_image
+from src.smart_fridge_db import *
 from src.food_classifier import classify_food
 from time import time
 
 def demo():
     ensure_schema()
-    
+
     # Add with auto expiry (uses shelf-life dictionary)
     add_item_simple("Milk", quantity=1, unit="bottle")
 
@@ -22,19 +22,20 @@ def demo():
 
     add_item_by_image("pictures\\sushi.jpg", quantity= 12, storage="freezer")
 
-    
+    consume("Chicken", 2,3)
+
 
     print("\nAll items:")
     for item in get_all_items():
-        print(f"{item['food_name']:<12} | storage={item['storage']} | expires={item['expiration_date']} | status={item['status']}")
+        print(f"id={item['item_id']} | {item['food_name']:<12} | storage={item['storage']} | expires={item['expiration_date']} | status={item['status']}")
 
     print("\nExpiring within 3 days (fridge only):")
     for item in get_expiring_items(3):
-        print(f"{item['food_name']:<12} → {item['expiration_date']} ({item['status']})")
+        print(f"id={item['item_id']} | {item['food_name']:<12} → {item['expiration_date']} ({item['status']})")
 
     print("\nFreezer items (never marked expiring):")
     for item in get_freezer_items():
-        print(f"{item['food_name']:<12} | status={item['status']}")
+        print(f"id={item['item_id']} | {item['food_name']:<12} | status={item['status']}")
 
     clear_database()
 
