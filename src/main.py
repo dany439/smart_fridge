@@ -1,6 +1,9 @@
 from src.setup_db import ensure_schema
 from src.shelf_life_data import SHELF_LIFE_DAYS
-from src.smart_fridge_db import add_item_by_name, get_all_items, get_expiring_items, get_freezer_items, clear_database, add_item_simple
+from src.food_categories import FOOD_CATEGORIES
+from src.smart_fridge_db import add_item_by_name, get_all_items, get_expiring_items, get_freezer_items, clear_database, add_item_simple, add_item_by_image
+from src.food_classifier import classify_food
+from time import time
 
 def demo():
     ensure_schema()
@@ -12,9 +15,12 @@ def demo():
 
     # Add with explicit expiry date
     add_item_simple("Chicken", quantity=2, unit="pcs", expiration_date="2025-11-12")
+    add_item_simple("Chicken", quantity=4, unit="pcs")
 
     # Add frozen (no expiry)
     add_item_simple("Fish", quantity=3, unit="fillets", storage="freezer")
+
+    add_item_by_image("pictures\\sushi.jpg", quantity= 12, storage="freezer")
 
     
 
@@ -34,3 +40,10 @@ def demo():
 
 if __name__ == "__main__":
     demo()
+
+    # t0 = time()
+    # print(classify_food("pictures\\sushi.jpg", visualize= False))
+    # t1 = time()
+    # print(classify_food("pictures\\Perfect-Pan-Seared-Ribeye-Steak.jpg", visualize= False))
+    # t2 = time()
+    # print("iteration 1 took", (t1 - t0), "iteration 2 took:", (t2 - t1))
