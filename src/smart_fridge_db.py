@@ -3,6 +3,7 @@ from . import config
 from datetime import date, timedelta
 from src.shelf_life_data import SHELF_LIFE_DAYS 
 from src.food_categories import FOOD_CATEGORIES
+from typing import List, Dict
 
 def get_connection():
     """Create a new DB connection."""
@@ -401,3 +402,68 @@ def consume(name: str, qty_used: float, item_id: int | None = None) -> str:
         # Always close the second connection, even if an exception occurs.
         conn2.close()
 
+
+
+def get_fridge_items_for_llm(user_id: int | None = None) -> List[Dict]:
+    """
+    Return ingredients in a simple format for the LLM:
+
+    [
+      {"name": "chicken breast", "expires_in_days": 2},
+      {"name": "spinach", "expires_in_days": 5},
+      ...
+    ]
+
+    - Uses item_status_view.
+    - Includes BOTH fridge and freezer items (storage IN ('fridge','freezer')).
+    - For rows with a real expiration_date, we compute days until expiry.
+    - For rows with expiration_date = NULL (e.g. freezer items), we treat them
+      as very long shelf-life (e.g. 365 days) so they are available but not urgent.
+    - If multiple rows share the same food_name, we keep the *smallest*
+      expires_in_days (most urgent one).
+    - Currently user_id is ignored because the schema is global; kept only
+      for future multi-user support.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor(dictionary=True) as cur:
+            cur.execute("""
+                SELECT food_name, expiration_date, storage, quantity
+                FROM item_status_view
+                WHERE quantity > 0
+                  AND storage IN ('fridge', 'freezer');
+            """)
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    today = date.today()
+    name_to_days: Dict[str, int] = {}
+
+    for row in rows:
+        food_name = row["food_name"]
+        exp_date = row["expiration_date"]
+        storage = row["storage"]
+
+        # If we have a real expiration_date, compute days left
+        if exp_date is not None:
+            days_left = (exp_date - today).days
+            expires_in_days = max(days_left, 0)
+        else:
+            # No expiration_date (e.g. freezer item): treat as long shelf life.
+            # You can tweak this number (365, 999, etc.) as you like.
+            expires_in_days = 365
+
+        # Aggregate: keep the most urgent (smallest days) per food_name
+        if food_name in name_to_days:
+            name_to_days[food_name] = min(name_to_days[food_name], expires_in_days)
+        else:
+            name_to_days[food_name] = expires_in_days
+
+    # Convert to list for the LLM
+    items: List[Dict] = [
+        {"name": name, "expires_in_days": days}
+        for name, days in name_to_days.items()
+    ]
+
+    return items

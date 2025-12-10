@@ -3,6 +3,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+if not GEMINI_API_KEY:
+    raise RuntimeError("GEMINI_API_KEY not set in environment")
+
+
 MYSQL_HOST = os.getenv("MYSQL_HOST", "127.0.0.1")  # force TCP on Windows
 MYSQL_PORT = int(os.getenv("MYSQL_PORT", "3306"))
 MYSQL_USER = os.getenv("MYSQL_USER", "root")
