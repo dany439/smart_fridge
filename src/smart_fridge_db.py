@@ -5,6 +5,10 @@ from src.shelf_life_data import SHELF_LIFE_DAYS
 from src.food_categories import FOOD_CATEGORIES
 from typing import List, Dict
 
+def normalize_str(s: str | None) -> str | None:
+    return s.strip().lower() if isinstance(s, str) else s
+
+
 def get_connection():
     """Create a new DB connection."""
     return mysql.connector.connect(
@@ -19,6 +23,7 @@ def get_connection():
 
 def get_food_type_id_by_name(name: str):
     """Return food_type_id for a given name, or None if not found."""
+    name = normalize_str(name)
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -31,6 +36,7 @@ def get_food_type_id_by_name(name: str):
 def create_food_type(name: str, category: str = None, average_shelf_life_days: int = None,
                      calories_per_100g: float = None, notes: str = None) -> int:
     """Create a new food type and return its id."""
+    name = normalize_str(name)
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -45,6 +51,7 @@ def create_food_type(name: str, category: str = None, average_shelf_life_days: i
 
 def get_or_create_food_type_id(name: str, category: str = None, average_shelf_life_days: int = None) -> int:
     """Fetch id for a food type by name, or create it if missing."""
+    name = normalize_str(name)
     ftid = get_food_type_id_by_name(name)
 
     # --- If category not manually provided, try dictionary ---
@@ -85,6 +92,9 @@ def add_item_by_name(name: str, quantity: float = 1, unit: str = 'pcs',
                      added_by: str = 'user', detection_label: str = None,
                      confidence: float = None, category: str = None,
                      average_shelf_life_days: int = None, storage: str = 'fridge', **kwargs) -> int:  # ← NEW
+    name = normalize_str(name)
+    storage = normalize_str(storage)
+    unit = normalize_str(unit)
     ftid = get_or_create_food_type_id(name, category=category,
                                       average_shelf_life_days=average_shelf_life_days)
     return add_item(ftid, quantity=quantity, unit=unit, added_by=added_by,
@@ -171,25 +181,47 @@ def get_freezer_items():
     finally:
         conn.close()
 
-def add_item_simple(name: str, quantity: float = 1, unit: str = "pcs", 
-                    expiration_date: str | None = None, storage: str = "fridge") -> int:
+def add_item_simple(
+    name: str,
+    quantity: float = 1,
+    unit: str = "pcs",
+    expiration_date: str | date | None = None,
+    storage: str = "fridge",
+    location_slot: str | None = None,
+) -> int:
     """
     Add a food item by name only.
-    You specify: name, quantity, unit, and optionally expiration_date.
-    If expiration_date is omitted, it's auto-calculated using the shelf-life dictionary.
+    Auto-calculates expiration date if omitted (uses shelf-life dictionary).
     """
-    from .smart_fridge_db import get_or_create_food_type_id, add_item   # to avoid circular imports
+    name = normalize_str(name)
+    storage = normalize_str(storage)
+    unit = normalize_str(unit)
+
+
+
+
+    from datetime import date
+    from .smart_fridge_db import get_or_create_food_type_id, add_item
 
     # Look up or create the food type and its default shelf life
     shelf_life = SHELF_LIFE_DAYS.get(name, 7)
-    food_type_id = get_or_create_food_type_id(name, average_shelf_life_days=shelf_life)
+    food_type_id = get_or_create_food_type_id(
+        name,
+        average_shelf_life_days=shelf_life
+    )
 
-    # Determine the expiry date if none given
-    if not expiration_date and storage == "fridge":
-        expiration_date = date.today().toordinal() + shelf_life  # temp as int
-        expiration_date = date.fromordinal(expiration_date)
-    elif storage == "freezer":
-        expiration_date = None  # frozen items don't expire
+    # Normalize expiration_date
+    if expiration_date is not None:
+        if isinstance(expiration_date, str):
+            expiration_date = date.fromisoformat(expiration_date)
+    else:
+        if storage == "fridge":
+            expiration_date = date.today() + timedelta(days=shelf_life)
+        else:  # freezer
+            expiration_date = None
+
+    if storage == "freezer":
+        expiration_date = None
 
     # Insert into DB
     item_id = add_item(
@@ -199,11 +231,15 @@ def add_item_simple(name: str, quantity: float = 1, unit: str = "pcs",
         expiration_date=expiration_date,
         detection_label=name,
         added_by="user",
-        storage=storage
+        storage=storage,
+        location_slot=location_slot
     )
 
-    print(f"✅ Added {quantity} {unit} of {name} ({storage})"
-          f"{' expiring on ' + str(expiration_date) if expiration_date else ''}")
+    print(
+        f"✅ Added {quantity} {unit} of {name} ({storage})"
+        f"{' expiring on ' + str(expiration_date) if expiration_date else ''}"
+    )
+
     return item_id
 
 from datetime import date, timedelta  # make sure this is at the top of the file
@@ -232,12 +268,15 @@ def add_item_by_image(
            - added_by        = "camera"
     """
 
+
     # Import here to avoid circular imports
     from .food_classifier import classify_food
 
     # 1) Classify the image
     predicted_name, predicted_conf = classify_food(image_path)
-    label = predicted_name or "Unknown"
+    label = normalize_str(predicted_name) or "unknown"
+    storage = normalize_str(storage)
+    unit = normalize_str(unit)
 
     # 2) Shelf life and food type
     shelf_life = SHELF_LIFE_DAYS.get(label, 7)
@@ -254,6 +293,9 @@ def add_item_by_image(
             exp_dt = date.today() + timedelta(days=shelf_life)
     else:
         exp_dt = date.fromisoformat(expiration_date) if isinstance(expiration_date, str) else expiration_date
+
+    if storage == "freezer":
+        exp_dt = None
 
     # 4) Insert into DB
     item_id = add_item(
@@ -297,6 +339,8 @@ def consume(name: str, qty_used: float, item_id: int | None = None) -> str:
     Raises:
         ValueError: if qty_used is invalid, item not found, or more was requested than available.
     """
+
+    name = normalize_str(name)
 
     # --- Basic validation on qty_used ---
     if qty_used <= 0:
@@ -467,3 +511,4 @@ def get_fridge_items_for_llm(user_id: int | None = None) -> List[Dict]:
     ]
 
     return items
+

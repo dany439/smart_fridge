@@ -1,57 +1,57 @@
 FOOD_CATEGORIES = {
-    # Dairy
-    "Milk": "Dairy",
-    "Yogurt": "Dairy",
-    "Cheese": "Dairy",
-    "Butter": "Dairy",
+    # dairy
+    "milk": "dairy",
+    "yogurt": "dairy",
+    "cheese": "dairy",
+    "butter": "dairy",
 
-    # Raw meat & seafood
-    "Chicken": "Meat",
-    "Beef": "Meat",
-    "Fish": "Fish",
-    "Sausage": "Meat",
-    "Ham": "Meat",
+    # raw meat & seafood
+    "chicken": "meat",
+    "beef": "meat",
+    "fish": "fish",
+    "sausage": "meat",
+    "ham": "meat",
 
-    # Fruits
-    "Apple": "Fruit",
-    "Banana": "Fruit",
-    "Strawberry": "Fruit",
-    "Orange": "Fruit",
-    "Grapes": "Fruit",
-    "Watermelon": "Fruit",
+    # fruits
+    "apple": "fruit",
+    "banana": "fruit",
+    "strawberry": "fruit",
+    "orange": "fruit",
+    "grapes": "fruit",
+    "watermelon": "fruit",
 
-    # Vegetables
-    "Tomato": "Vegetable",
-    "Lettuce": "Vegetable",
-    "Cucumber": "Vegetable",
-    "Carrot": "Vegetable",
-    "Potato": "Vegetable",
-    "Onion": "Vegetable",
+    # vegetables
+    "tomato": "vegetable",
+    "lettuce": "vegetable",
+    "cucumber": "vegetable",
+    "carrot": "vegetable",
+    "potato": "vegetable",
+    "onion": "vegetable",
 
-    # Drinks
-    "Juice": "Beverage",
-    "Soda": "Beverage",
+    # drinks
+    "juice": "beverage",
+    "soda": "beverage",
 
-    # Eggs
-    "Eggs": "Eggs",
+    # eggs
+    "eggs": "eggs",
 
-    # Condiments
-    "Ketchup": "Condiment",
-    "Mayonnaise": "Condiment",
+    # condiments
+    "ketchup": "condiment",
+    "mayonnaise": "condiment",
 
-    # Leftovers foods / cooked foods
-    "Cooked Rice": "Leftovers",
-    "caesar Salad": "Leftovers",
-    "chicken Wings": "Leftovers",
-    "French Fries": "Leftovers",
-    "Fried Rice": "Leftovers",
-    "Hamburger": "Leftovers",
-    "Pizza": "Leftovers",
-    "Spaghetti Bolognese": "Leftovers",
-    "Steak": "Leftovers",
-    "Sushi": "Leftovers",   # raw sushi = "Leftovers" for storage purposes
-    "Leftovers": "Leftovers",
+    # leftovers / cooked foods
+    "cooked rice": "leftovers",
+    "caesar salad": "leftovers",
+    "chicken wings": "leftovers",
+    "french fries": "leftovers",
+    "fried rice": "leftovers",
+    "hamburger": "leftovers",
+    "pizza": "leftovers",
+    "spaghetti bolognese": "leftovers",
+    "steak": "leftovers",
+    "sushi": "leftovers",
+    "leftovers": "leftovers",
 
-    # Frozen-only items
-    "ice_cream": "Frozen",
+    # frozen-only
+    "ice cream": "frozen",
 }
