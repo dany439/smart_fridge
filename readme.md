@@ -37,7 +37,24 @@ python -m venv .venv
 .venv\Scripts\activate
 # macOS / Linux
 source .venv/bin/activate
-
-
+```
 
 pip install -r requirements.txt
+
+---
+
+### Supported Food Classes
+
+The classifier currently supports the following food items:
+
+- pizza
+- sushi
+- hamburger
+- french fries
+- spaghetti bolognese
+- fried rice
+- chicken wings
+- caesar salad
+- steak
+- ice cream
+
