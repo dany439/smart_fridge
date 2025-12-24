@@ -1,6 +1,7 @@
 import os
 import mysql.connector
 
+
 def ensure_schema(
     host: str = None,
     port: int = None,
@@ -9,18 +10,18 @@ def ensure_schema(
     database: str = None,
 ):
     """
-    Create the smart_fridge database schema if it doesn't exist.
-    Call this once at startup (before inserts).
+    Ensure the smart_fridge database schema exists.
+    Safe to run on every application startup.
     """
 
-    # Defaults (read from environment if provided)
+    # --- Defaults (env first, then fallback) ---
     host = host or os.getenv("MYSQL_HOST", "127.0.0.1")
     port = int(port or os.getenv("MYSQL_PORT", "3306"))
     user = user or os.getenv("MYSQL_USER", "root")
     password = password or os.getenv("MYSQL_PASSWORD", "")
     database = database or os.getenv("MYSQL_DB", "smart_fridge")
 
-    # 1) Ensure database exists
+    # --- 1) Ensure database exists ---
     server_conn = mysql.connector.connect(
         host=host,
         port=port,
@@ -28,15 +29,17 @@ def ensure_schema(
         password=password,
     )
     server_conn.autocommit = True
+
     with server_conn.cursor() as cur:
         cur.execute(f"""
             CREATE DATABASE IF NOT EXISTS `{database}`
             CHARACTER SET utf8mb4
             COLLATE utf8mb4_general_ci;
         """)
+
     server_conn.close()
 
-    # 2) Connect to the database
+    # --- 2) Connect to the database ---
     conn = mysql.connector.connect(
         host=host,
         port=port,
@@ -48,27 +51,16 @@ def ensure_schema(
     try:
         with conn.cursor() as cur:
 
-            # --- Remove ONLY the legacy expiration trigger ---
+            # --- food_types (base table) ---
             cur.execute("""
-                DROP TRIGGER IF EXISTS set_expiration_date_before_insert;
+                CREATE TABLE IF NOT EXISTS food_types (
+                    food_type_id INT AUTO_INCREMENT PRIMARY KEY,
+                    name VARCHAR(100) NOT NULL UNIQUE,
+                    category VARCHAR(50) NOT NULL
+                ) ENGINE=InnoDB;
             """)
 
-            # --- Ensure storage column exists (migration-safe) ---
-            cur.execute("""
-                SELECT 1
-                FROM information_schema.COLUMNS
-                WHERE TABLE_SCHEMA = %s
-                  AND TABLE_NAME = 'food_items'
-                  AND COLUMN_NAME = 'storage';
-            """, (database,))
-            if cur.fetchone() is None:
-                cur.execute("""
-                    ALTER TABLE food_items
-                    ADD COLUMN storage ENUM('fridge','freezer')
-                    NOT NULL DEFAULT 'fridge';
-                """)
-
-            # --- food_items table ---
+            # --- food_items ---
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS food_items (
                     item_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -83,11 +75,13 @@ def ensure_schema(
                     location_slot VARCHAR(50),
                     added_by ENUM('user','camera','barcode') DEFAULT 'user',
                     storage ENUM('fridge','freezer') NOT NULL DEFAULT 'fridge',
+
                     CONSTRAINT fk_food_items_type
                         FOREIGN KEY (food_type_id)
                         REFERENCES food_types(food_type_id)
                         ON DELETE CASCADE
                         ON UPDATE CASCADE,
+
                     INDEX idx_expiration_date (expiration_date),
                     INDEX idx_storage (storage)
                 ) ENGINE=InnoDB;
