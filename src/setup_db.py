@@ -10,18 +10,20 @@ def ensure_schema(
     database: str = None,
 ):
     """
-    Ensure the smart_fridge database schema exists.
-    Safe to run on every application startup.
+    Create the smart_fridge database and schema from scratch.
+    Safe to run ONLY when the database does not already exist.
     """
 
-    # --- Defaults (env first, then fallback) ---
+    # --- Read config / env ---
     host = host or os.getenv("MYSQL_HOST", "127.0.0.1")
     port = int(port or os.getenv("MYSQL_PORT", "3306"))
     user = user or os.getenv("MYSQL_USER", "root")
     password = password or os.getenv("MYSQL_PASSWORD", "")
     database = database or os.getenv("MYSQL_DB", "smart_fridge")
 
-    # --- 1) Ensure database exists ---
+    # ------------------------------------------------------------------
+    # 1) Create database
+    # ------------------------------------------------------------------
     server_conn = mysql.connector.connect(
         host=host,
         port=port,
@@ -32,14 +34,16 @@ def ensure_schema(
 
     with server_conn.cursor() as cur:
         cur.execute(f"""
-            CREATE DATABASE IF NOT EXISTS `{database}`
+            CREATE DATABASE `{database}`
             CHARACTER SET utf8mb4
             COLLATE utf8mb4_general_ci;
         """)
 
     server_conn.close()
 
-    # --- 2) Connect to the database ---
+    # ------------------------------------------------------------------
+    # 2) Connect to the new database
+    # ------------------------------------------------------------------
     conn = mysql.connector.connect(
         host=host,
         port=port,
@@ -51,18 +55,25 @@ def ensure_schema(
     try:
         with conn.cursor() as cur:
 
-            # --- food_types (base table) ---
+            # ----------------------------------------------------------
+            # food_types
+            # ----------------------------------------------------------
             cur.execute("""
-                CREATE TABLE IF NOT EXISTS food_types (
+                CREATE TABLE food_types (
                     food_type_id INT AUTO_INCREMENT PRIMARY KEY,
                     name VARCHAR(100) NOT NULL UNIQUE,
-                    category VARCHAR(50) NOT NULL
+                    category VARCHAR(50) NOT NULL,
+                    average_shelf_life_days INT DEFAULT NULL,
+                    calories_per_100g DECIMAL(8,2) DEFAULT NULL,
+                    notes TEXT DEFAULT NULL
                 ) ENGINE=InnoDB;
             """)
 
-            # --- food_items ---
+            # ----------------------------------------------------------
+            # food_items
+            # ----------------------------------------------------------
             cur.execute("""
-                CREATE TABLE IF NOT EXISTS food_items (
+                CREATE TABLE food_items (
                     item_id INT AUTO_INCREMENT PRIMARY KEY,
                     food_type_id INT NOT NULL,
                     quantity DECIMAL(8,2) DEFAULT 1.00,
@@ -87,9 +98,11 @@ def ensure_schema(
                 ) ENGINE=InnoDB;
             """)
 
-            # --- View ---
+            # ----------------------------------------------------------
+            # item_status_view
+            # ----------------------------------------------------------
             cur.execute("""
-                CREATE OR REPLACE VIEW item_status_view AS
+                CREATE VIEW item_status_view AS
                 SELECT
                     i.item_id,
                     t.food_type_id,
