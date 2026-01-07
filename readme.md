@@ -86,3 +86,16 @@ The classifier currently supports the following food items:
 - steak
 - ice cream
 
+
+---
+
+## How to Run
+
+1. Make sure you have Python 3.10+ installed
+2. Install dependencies:
+   pip install -r requirements.txt
+3. Start the MySQL server using XAMPP
+4. Run the application:
+   python src/smart_fridge_gui.py
+
+
