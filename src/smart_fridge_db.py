@@ -1,8 +1,8 @@
 import mysql.connector
-from . import config
+import config
 from datetime import date, timedelta
-from src.shelf_life_data import SHELF_LIFE_DAYS 
-from src.food_categories import FOOD_CATEGORIES
+from shelf_life_data import SHELF_LIFE_DAYS 
+from food_categories import FOOD_CATEGORIES
 from typing import List, Dict
 
 def normalize_str(s: str | None) -> str | None:
@@ -201,7 +201,7 @@ def add_item_simple(
 
 
     from datetime import date
-    from .smart_fridge_db import get_or_create_food_type_id, add_item
+    from smart_fridge_db import get_or_create_food_type_id, add_item
 
     # Look up or create the food type and its default shelf life
     shelf_life = SHELF_LIFE_DAYS.get(name, 7)
@@ -270,7 +270,7 @@ def add_item_by_image(
 
 
     # Import here to avoid circular imports
-    from .food_classifier import classify_food
+    from food_classifier import classify_food
 
     # 1) Classify the image
     predicted_name, predicted_conf = classify_food(image_path)

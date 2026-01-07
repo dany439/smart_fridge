@@ -3,15 +3,15 @@ from tkinter import ttk, filedialog, messagebox
 from datetime import date
 
 # --- Smart Fridge imports ---
-from src.setup_db import ensure_schema
-from src.smart_fridge_db import (
+from setup_db import ensure_schema
+from smart_fridge_db import (
     add_item_simple,
     add_item_by_image,
     get_all_items,
     consume,
     clear_database
 )
-from src.recipe_service import get_recipe_suggestions_for_user
+from recipe_service import get_recipe_suggestions_for_user
 
 
 # ==============================

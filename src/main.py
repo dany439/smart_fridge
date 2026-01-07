@@ -1,10 +1,10 @@
-from src.setup_db import ensure_schema
-from src.shelf_life_data import SHELF_LIFE_DAYS
-from src.food_categories import FOOD_CATEGORIES
-from src.smart_fridge_db import *
-from src.food_classifier import classify_food
+from setup_db import ensure_schema
+from shelf_life_data import SHELF_LIFE_DAYS
+from food_categories import FOOD_CATEGORIES
+from smart_fridge_db import *
+from food_classifier import classify_food
 from time import time
-from src.recipe_service import get_recipe_suggestions_for_user
+from recipe_service import get_recipe_suggestions_for_user
 from pprint import pprint
 
 def demo():

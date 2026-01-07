@@ -1,9 +1,9 @@
 # recipes_service.py
 from typing import List, Dict
 
-from src.smart_fridge_db import get_fridge_items_for_llm
-from src.recipe_llm_gemini import generate_recipes_with_gemini
-from src.recipe_rank import split_and_rank_recipes  # your local logic
+from smart_fridge_db import get_fridge_items_for_llm
+from recipe_llm_gemini import generate_recipes_with_gemini
+from recipe_rank import split_and_rank_recipes  # your local logic
 
 
 def get_recipe_suggestions_for_user(
